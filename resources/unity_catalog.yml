@@ -1,0 +1,54 @@
+# Unity Catalog Resources
+# Defines catalogs, schemas, and volumes for NYC Taxi data
+
+resources:
+  # Note: Catalog gm_demo already exists, so we don't create it
+  # We'll only create schemas within the existing catalog
+  
+  # Schema definitions
+  schemas:
+    # Bronze layer - raw ingestion
+    raw_schema:
+      name: raw
+      catalog_name: ${var.catalog_name}
+      comment: "Raw layer - parquet files ingested as Delta tables"
+      properties:
+        layer: "bronze"
+        description: "Unprocessed taxi trip data from TLC"
+    
+    # Silver layer - curated/cleaned
+    curated_schema:
+      name: curated
+      catalog_name: ${var.catalog_name}
+      comment: "Curated layer - cleaned and validated data"
+      properties:
+        layer: "silver"
+        description: "Cleaned taxi trip data with quality checks applied"
+    
+    # Gold layer - analytics/aggregations
+    analytics_schema:
+      name: analytics
+      catalog_name: ${var.catalog_name}
+      comment: "Analytics layer - aggregated tables for reporting"
+      properties:
+        layer: "gold"
+        description: "Aggregated metrics and dimensions for analysis"
+  
+  # Note: Volume gm_demo.default.ny_texi already exists with source data
+  # We'll create additional volumes for checkpoints and artifacts if needed
+  volumes:
+    # Managed volume for checkpoints
+    checkpoints_volume:
+      name: taxi_checkpoints
+      catalog_name: ${var.catalog_name}
+      schema_name: raw
+      volume_type: MANAGED
+      comment: "Managed volume for streaming checkpoints and metadata"
+    
+    # Managed volume for artifacts
+    artifacts_volume:
+      name: taxi_artifacts
+      catalog_name: ${var.catalog_name}
+      schema_name: raw
+      volume_type: MANAGED
+      comment: "Managed volume for bundle artifacts and logs"

@@ -1,0 +1,209 @@
+# Workflow Definitions
+# Defines jobs and tasks for NYC Taxi data ingestion pipeline
+
+resources:
+  jobs:
+    # Main data ingestion workflow
+    taxi_data_ingestion:
+      name: nyc_taxi_ingestion_${bundle.target}
+      description: "Ingest NYC taxi parquet data into Unity Catalog Delta tables"
+      
+      tasks:
+        # Task 1: Ingest reference data (taxi zones)
+        - task_key: ingest_taxi_zones
+          notebook_task:
+            notebook_path: ../src/ingestion/ingest_taxi_zones.py
+            base_parameters:
+              catalog: ${var.catalog_name}
+              source_path: ${var.source_data_path}
+          
+          new_cluster:
+            spark_version: "14.3.x-scala2.12"
+            node_type_id: ${var.cluster_node_type}
+            num_workers: 1
+            spark_conf:
+              spark.databricks.delta.optimizeWrite.enabled: "true"
+              spark.databricks.delta.autoCompact.enabled: "true"
+          
+          timeout_seconds: 600
+          max_retries: 2
+        
+        # Task 2: Ingest yellow taxi data (2021)
+        - task_key: ingest_yellow_taxi_2021
+          depends_on:
+            - task_key: ingest_taxi_zones
+          
+          notebook_task:
+            notebook_path: ../src/ingestion/batch_ingest.py
+            base_parameters:
+              catalog: ${var.catalog_name}
+              taxi_type: yellow_taxi
+              start_year: "2021"
+              end_year: "2021"
+              source_path: ${var.source_data_path}
+          
+          new_cluster:
+            spark_version: "14.3.x-scala2.12"
+            node_type_id: ${var.cluster_node_type}
+            autoscale:
+              min_workers: ${var.min_workers}
+              max_workers: ${var.max_workers}
+            spark_conf:
+              spark.databricks.delta.optimizeWrite.enabled: "true"
+              spark.databricks.delta.autoCompact.enabled: "true"
+              spark.sql.files.maxPartitionBytes: "134217728"
+              spark.sql.adaptive.enabled: "true"
+              spark.sql.adaptive.coalescePartitions.enabled: "true"
+          
+          timeout_seconds: 7200
+          max_retries: 3
+          min_retry_interval_millis: 300000
+        
+        # Task 3: Ingest green taxi data (2021)
+        - task_key: ingest_green_taxi_2021
+          depends_on:
+            - task_key: ingest_taxi_zones
+          
+          notebook_task:
+            notebook_path: ../src/ingestion/batch_ingest.py
+            base_parameters:
+              catalog: ${var.catalog_name}
+              taxi_type: green_taxi
+              start_year: "2021"
+              end_year: "2021"
+              source_path: ${var.source_data_path}
+          
+          new_cluster:
+            spark_version: "14.3.x-scala2.12"
+            node_type_id: ${var.cluster_node_type}
+            autoscale:
+              min_workers: ${var.min_workers}
+              max_workers: ${var.max_workers}
+            spark_conf:
+              spark.databricks.delta.optimizeWrite.enabled: "true"
+              spark.databricks.delta.autoCompact.enabled: "true"
+              spark.sql.files.maxPartitionBytes: "134217728"
+              spark.sql.adaptive.enabled: "true"
+              spark.sql.adaptive.coalescePartitions.enabled: "true"
+          
+          timeout_seconds: 7200
+          max_retries: 3
+          min_retry_interval_millis: 300000
+        
+        # Task 4: Ingest FHV data (2021)
+        - task_key: ingest_fhv_2021
+          depends_on:
+            - task_key: ingest_taxi_zones
+          
+          notebook_task:
+            notebook_path: ../src/ingestion/batch_ingest.py
+            base_parameters:
+              catalog: ${var.catalog_name}
+              taxi_type: for_hire_vehicle
+              start_year: "2021"
+              end_year: "2021"
+              source_path: ${var.source_data_path}
+          
+          new_cluster:
+            spark_version: "14.3.x-scala2.12"
+            node_type_id: ${var.cluster_node_type}
+            autoscale:
+              min_workers: ${var.min_workers}
+              max_workers: ${var.max_workers}
+            spark_conf:
+              spark.databricks.delta.optimizeWrite.enabled: "true"
+              spark.databricks.delta.autoCompact.enabled: "true"
+              spark.sql.files.maxPartitionBytes: "134217728"
+              spark.sql.adaptive.enabled: "true"
+          
+          timeout_seconds: 7200
+          max_retries: 3
+          min_retry_interval_millis: 300000
+        
+        # Task 5: Ingest HVFHS data (2021)
+        - task_key: ingest_hvfhs_2021
+          depends_on:
+            - task_key: ingest_taxi_zones
+          
+          notebook_task:
+            notebook_path: ../src/ingestion/batch_ingest.py
+            base_parameters:
+              catalog: ${var.catalog_name}
+              taxi_type: high_volume_for_hire_vehicle
+              start_year: "2021"
+              end_year: "2021"
+              source_path: ${var.source_data_path}
+          
+          new_cluster:
+            spark_version: "14.3.x-scala2.12"
+            node_type_id: ${var.cluster_node_type}
+            autoscale:
+              min_workers: ${var.min_workers}
+              max_workers: ${var.max_workers}
+            spark_conf:
+              spark.databricks.delta.optimizeWrite.enabled: "true"
+              spark.databricks.delta.autoCompact.enabled: "true"
+          
+          timeout_seconds: 7200
+          max_retries: 3
+          min_retry_interval_millis: 300000
+        
+        # Task 6: Data quality validation
+        - task_key: validate_data_quality
+          depends_on:
+            - task_key: ingest_yellow_taxi_2021
+            - task_key: ingest_green_taxi_2021
+            - task_key: ingest_fhv_2021
+            - task_key: ingest_hvfhs_2021
+          
+          notebook_task:
+            notebook_path: ../src/quality/validate_delta.py
+            base_parameters:
+              catalog: ${var.catalog_name}
+              schema: raw
+          
+          new_cluster:
+            spark_version: "14.3.x-scala2.12"
+            node_type_id: ${var.cluster_node_type}
+            num_workers: 1
+          
+          timeout_seconds: 1800
+          max_retries: 1
+        
+        # Task 7: Optimize Delta tables
+        - task_key: optimize_tables
+          depends_on:
+            - task_key: validate_data_quality
+          
+          notebook_task:
+            notebook_path: ../src/optimization/optimize.py
+            base_parameters:
+              catalog: ${var.catalog_name}
+              schema: raw
+              operation: optimize
+          
+          new_cluster:
+            spark_version: "14.3.x-scala2.12"
+            node_type_id: ${var.cluster_node_type}
+            autoscale:
+              min_workers: ${var.min_workers}
+              max_workers: ${var.max_workers}
+          
+          timeout_seconds: 3600
+          max_retries: 2
+      
+      # Job-level settings
+      max_concurrent_runs: 1
+      timeout_seconds: 28800  # 8 hours
+      
+      # Permissions
+      permissions:
+        - level: CAN_MANAGE_RUN
+          user_name: ${workspace.current_user.userName}
+      
+      # Tags
+      tags:
+        environment: ${bundle.target}
+        project: nyc_taxi
+        pipeline: ingestion
+
