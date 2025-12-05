@@ -7,11 +7,17 @@ Bronx, Staten Island, JFK, LGA) over time.
 """
 
 import matplotlib.pyplot as plt
+from matplotlib.ticker import StrMethodFormatter
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import random
 from typing import Optional
+
+# Constants for demand simulation
+HOLIDAY_DEMAND_MULTIPLIER = 1.35
+MIN_DEMAND_MULTIPLIER = 0.9
+DEMAND_VARIANCE = 0.2
 
 
 def generate_sample_taxi_data(
@@ -68,9 +74,6 @@ def generate_sample_taxi_data(
     # Day-of-week multiplier
     dow_multiplier = {0: 1.00, 1: 1.00, 2: 1.02, 3: 1.02, 4: 1.10, 5: 1.25, 6: 1.20}
     
-    # Holiday demand multiplier
-    holiday_multiplier = 1.35
-    
     # Zone pickup share
     zone_base_share = {
         "Manhattan": 0.42, "Brooklyn": 0.18, "Queens": 0.16, 
@@ -85,9 +88,9 @@ def generate_sample_taxi_data(
         
         demand = year_demand_index.get(y, 1.0) * month_seasonality[m] * dow_multiplier[dow]
         if is_holiday:
-            demand *= holiday_multiplier
+            demand *= HOLIDAY_DEMAND_MULTIPLIER
         
-        day_trips = int(base_count * demand * (0.9 + 0.2 * np.random.rand()))
+        day_trips = int(base_count * demand * (MIN_DEMAND_MULTIPLIER + DEMAND_VARIANCE * np.random.rand()))
         rows = []
         
         # Normalize zone shares
@@ -190,7 +193,7 @@ def plot_trips_by_city(
     ax.set_ylabel('Number of Trips', fontsize=12, fontweight='bold')
     
     # Format y-axis with commas for thousands
-    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{int(x):,}'))
+    ax.yaxis.set_major_formatter(StrMethodFormatter('{x:,.0f}'))
     
     # Add legend outside the plot
     ax.legend(
