@@ -1,0 +1,49 @@
+{
+  "discovery_date": "2025-12-05",
+  "year": "2023",
+  "volume_path": "/Volumes/gm_demo/gm_test_schema/gm_volume/2023",
+  "file_format": "parquet",
+  "notes": "Sample configuration - Update based on actual data discovery",
+  "key_columns": [
+    "trip_id"
+  ],
+  "date_columns": [
+    "pickup_datetime",
+    "dropoff_datetime"
+  ],
+  "partition_column": "pickup_datetime",
+  "metric_columns": [
+    "fare_amount",
+    "tip_amount",
+    "total_amount",
+    "trip_distance",
+    "passenger_count"
+  ],
+  "dimension_columns": [
+    "payment_type",
+    "rate_code",
+    "vendor_id",
+    "pickup_location_id",
+    "dropoff_location_id"
+  ],
+  "string_columns": [
+    "payment_type",
+    "rate_code",
+    "vendor_id"
+  ],
+  "null_handling_rules": {
+    "trip_id": "drop",
+    "pickup_datetime": "drop",
+    "fare_amount": 0,
+    "passenger_count": 1
+  },
+  "recommendations": {
+    "partition_strategy": "Daily partitioning by pickup_datetime",
+    "z_order_columns": [
+      "pickup_location_id",
+      "payment_type"
+    ],
+    "estimated_rows": "To be determined from discovery",
+    "estimated_size_mb": "To be determined from discovery"
+  }
+}

@@ -1,54 +1,136 @@
-# Unity Catalog Resources
-# Defines catalogs, schemas, and volumes for NYC Taxi data
+# Unity Catalog Configuration
+# Table registration and access control for GM Data Analysis
 
 resources:
-  # Note: Catalog gm_demo already exists, so we don't create it
-  # We'll only create schemas within the existing catalog
+  # Catalog configuration
+  catalogs:
+    gm_demo:
+      name: "gm_demo"
+      comment: "GM Data Analysis - Medallion Architecture"
+      properties:
+        owner: "data_engineering"
+        environment: "production"
   
-  # Schema definitions
+  # Schema configuration
   schemas:
-    # Bronze layer - raw ingestion
-    raw_schema:
-      name: raw
-      catalog_name: ${var.catalog_name}
-      comment: "Raw layer - parquet files ingested as Delta tables"
+    gm_test_schema:
+      name: "gm_test_schema"
+      catalog_name: "gm_demo"
+      comment: "Schema for GM test data and medallion architecture tables"
       properties:
-        layer: "bronze"
-        description: "Unprocessed taxi trip data from TLC"
-    
-    # Silver layer - curated/cleaned
-    curated_schema:
-      name: curated
-      catalog_name: ${var.catalog_name}
-      comment: "Curated layer - cleaned and validated data"
-      properties:
-        layer: "silver"
-        description: "Cleaned taxi trip data with quality checks applied"
-    
-    # Gold layer - analytics/aggregations
-    analytics_schema:
-      name: analytics
-      catalog_name: ${var.catalog_name}
-      comment: "Analytics layer - aggregated tables for reporting"
-      properties:
-        layer: "gold"
-        description: "Aggregated metrics and dimensions for analysis"
+        data_classification: "internal"
+        project: "gm_analysis"
   
-  # Note: Volume gm_demo.default.ny_texi already exists with source data
-  # We'll create additional volumes for checkpoints and artifacts if needed
+  # Volume configuration
   volumes:
-    # Managed volume for checkpoints
-    checkpoints_volume:
-      name: taxi_checkpoints
-      catalog_name: ${var.catalog_name}
-      schema_name: raw
-      volume_type: MANAGED
-      comment: "Managed volume for streaming checkpoints and metadata"
+    gm_volume:
+      name: "gm_volume"
+      catalog_name: "gm_demo"
+      schema_name: "gm_test_schema"
+      volume_type: "MANAGED"
+      comment: "Managed volume for GM raw data files"
+  
+  # Grants for catalog
+  grants:
+    # Data Engineering team - Full access
+    - principal: "data_engineering"
+      privileges:
+        - "USE_CATALOG"
+        - "USE_SCHEMA"
+        - "CREATE_SCHEMA"
+        - "CREATE_TABLE"
+        - "CREATE_VOLUME"
+      securable_type: "CATALOG"
+      securable_name: "gm_demo"
     
-    # Managed volume for artifacts
-    artifacts_volume:
-      name: taxi_artifacts
-      catalog_name: ${var.catalog_name}
-      schema_name: raw
-      volume_type: MANAGED
-      comment: "Managed volume for bundle artifacts and logs"
+    # Analytics team - Read access
+    - principal: "analytics_team"
+      privileges:
+        - "USE_CATALOG"
+        - "USE_SCHEMA"
+        - "SELECT"
+      securable_type: "CATALOG"
+      securable_name: "gm_demo"
+    
+    # Schema-level grants
+    - principal: "data_engineering"
+      privileges:
+        - "USE_SCHEMA"
+        - "CREATE_TABLE"
+        - "CREATE_VOLUME"
+        - "MODIFY"
+      securable_type: "SCHEMA"
+      securable_name: "gm_demo.gm_test_schema"
+    
+    # Bronze layer - Data Engineering only
+    - principal: "data_engineering"
+      privileges:
+        - "SELECT"
+        - "MODIFY"
+      securable_type: "TABLE"
+      securable_name: "gm_demo.gm_test_schema.bronze_*"
+    
+    # Silver layer - Data Engineering and Analytics
+    - principal: "data_engineering"
+      privileges:
+        - "SELECT"
+        - "MODIFY"
+      securable_type: "TABLE"
+      securable_name: "gm_demo.gm_test_schema.silver_*"
+    
+    - principal: "analytics_team"
+      privileges:
+        - "SELECT"
+      securable_type: "TABLE"
+      securable_name: "gm_demo.gm_test_schema.silver_*"
+    
+    # Gold layer - All users read access
+    - principal: "data_engineering"
+      privileges:
+        - "SELECT"
+        - "MODIFY"
+      securable_type: "TABLE"
+      securable_name: "gm_demo.gm_test_schema.gold_*"
+    
+    - principal: "analytics_team"
+      privileges:
+        - "SELECT"
+      securable_type: "TABLE"
+      securable_name: "gm_demo.gm_test_schema.gold_*"
+    
+    - principal: "business_users"
+      privileges:
+        - "SELECT"
+      securable_type: "TABLE"
+      securable_name: "gm_demo.gm_test_schema.gold_*"
+  
+  # Table properties and tags
+  table_tags:
+    bronze_tables:
+      tables:
+        - "gm_demo.gm_test_schema.bronze_gm_data_2023"
+      tags:
+        layer: "bronze"
+        data_classification: "raw"
+        retention_policy: "7_years"
+        pii_data: "false"
+    
+    silver_tables:
+      tables:
+        - "gm_demo.gm_test_schema.silver_gm_data_2023"
+      tags:
+        layer: "silver"
+        data_classification: "cleansed"
+        retention_policy: "5_years"
+        pii_data: "false"
+    
+    gold_tables:
+      tables:
+        - "gm_demo.gm_test_schema.gold_gm_data_2023_daily"
+        - "gm_demo.gm_test_schema.gold_gm_data_2023_monthly"
+        - "gm_demo.gm_test_schema.gold_gm_data_2023_dimensions"
+      tags:
+        layer: "gold"
+        data_classification: "aggregated"
+        retention_policy: "10_years"
+        business_critical: "true"

@@ -1,209 +1,181 @@
-# Workflow Definitions
-# Defines jobs and tasks for NYC Taxi data ingestion pipeline
+# Databricks Workflows Configuration
+# Medallion Architecture - GM Data Analysis 2023
 
 resources:
   jobs:
-    # Main data ingestion workflow
-    taxi_data_ingestion:
-      name: nyc_taxi_ingestion_${bundle.target}
-      description: "Ingest NYC taxi parquet data into Unity Catalog Delta tables"
+    gm_medallion_pipeline_2023:
+      name: "GM Medallion Pipeline - 2023"
+      description: "End-to-end medallion architecture pipeline for GM data 2023"
+      
+      # Use serverless compute for cost efficiency
+      job_clusters:
+        - job_cluster_key: "main_cluster"
+          new_cluster:
+            spark_version: "13.3.x-scala2.12"
+            node_type_id: "${var.cluster_node_type}"
+            num_workers: 2
+            spark_conf:
+              "spark.databricks.delta.preview.enabled": "true"
+              "spark.databricks.delta.retentionDurationCheck.enabled": "false"
+            custom_tags:
+              project: "gm_analysis"
+              environment: "production"
+              year: "2023"
+      
+      # Email notifications
+      email_notifications:
+        on_success:
+          - "data-engineering@company.com"
+        on_failure:
+          - "data-engineering@company.com"
+          - "alerts@company.com"
+      
+      # Timeout and retry configuration
+      timeout_seconds: 7200  # 2 hours
+      max_concurrent_runs: 1
       
       tasks:
-        # Task 1: Ingest reference data (taxi zones)
-        - task_key: ingest_taxi_zones
+        # Task 1: Bronze Layer Ingestion
+        - task_key: "bronze_ingestion"
+          description: "Ingest raw data into Bronze layer"
           notebook_task:
-            notebook_path: ../src/ingestion/ingest_taxi_zones.py
+            notebook_path: "../notebooks/bronze_ingestion.py"
             base_parameters:
-              catalog: ${var.catalog_name}
-              source_path: ${var.source_data_path}
-          
-          new_cluster:
-            spark_version: "14.3.x-scala2.12"
-            node_type_id: ${var.cluster_node_type}
-            num_workers: 1
-            spark_conf:
-              spark.databricks.delta.optimizeWrite.enabled: "true"
-              spark.databricks.delta.autoCompact.enabled: "true"
-          
-          timeout_seconds: 600
-          max_retries: 2
-        
-        # Task 2: Ingest yellow taxi data (2021)
-        - task_key: ingest_yellow_taxi_2021
-          depends_on:
-            - task_key: ingest_taxi_zones
-          
-          notebook_task:
-            notebook_path: ../src/ingestion/batch_ingest.py
-            base_parameters:
-              catalog: ${var.catalog_name}
-              taxi_type: yellow_taxi
-              start_year: "2021"
-              end_year: "2021"
-              source_path: ${var.source_data_path}
-          
-          new_cluster:
-            spark_version: "14.3.x-scala2.12"
-            node_type_id: ${var.cluster_node_type}
-            autoscale:
-              min_workers: ${var.min_workers}
-              max_workers: ${var.max_workers}
-            spark_conf:
-              spark.databricks.delta.optimizeWrite.enabled: "true"
-              spark.databricks.delta.autoCompact.enabled: "true"
-              spark.sql.files.maxPartitionBytes: "134217728"
-              spark.sql.adaptive.enabled: "true"
-              spark.sql.adaptive.coalescePartitions.enabled: "true"
-          
-          timeout_seconds: 7200
-          max_retries: 3
-          min_retry_interval_millis: 300000
-        
-        # Task 3: Ingest green taxi data (2021)
-        - task_key: ingest_green_taxi_2021
-          depends_on:
-            - task_key: ingest_taxi_zones
-          
-          notebook_task:
-            notebook_path: ../src/ingestion/batch_ingest.py
-            base_parameters:
-              catalog: ${var.catalog_name}
-              taxi_type: green_taxi
-              start_year: "2021"
-              end_year: "2021"
-              source_path: ${var.source_data_path}
-          
-          new_cluster:
-            spark_version: "14.3.x-scala2.12"
-            node_type_id: ${var.cluster_node_type}
-            autoscale:
-              min_workers: ${var.min_workers}
-              max_workers: ${var.max_workers}
-            spark_conf:
-              spark.databricks.delta.optimizeWrite.enabled: "true"
-              spark.databricks.delta.autoCompact.enabled: "true"
-              spark.sql.files.maxPartitionBytes: "134217728"
-              spark.sql.adaptive.enabled: "true"
-              spark.sql.adaptive.coalescePartitions.enabled: "true"
-          
-          timeout_seconds: 7200
-          max_retries: 3
-          min_retry_interval_millis: 300000
-        
-        # Task 4: Ingest FHV data (2021)
-        - task_key: ingest_fhv_2021
-          depends_on:
-            - task_key: ingest_taxi_zones
-          
-          notebook_task:
-            notebook_path: ../src/ingestion/batch_ingest.py
-            base_parameters:
-              catalog: ${var.catalog_name}
-              taxi_type: for_hire_vehicle
-              start_year: "2021"
-              end_year: "2021"
-              source_path: ${var.source_data_path}
-          
-          new_cluster:
-            spark_version: "14.3.x-scala2.12"
-            node_type_id: ${var.cluster_node_type}
-            autoscale:
-              min_workers: ${var.min_workers}
-              max_workers: ${var.max_workers}
-            spark_conf:
-              spark.databricks.delta.optimizeWrite.enabled: "true"
-              spark.databricks.delta.autoCompact.enabled: "true"
-              spark.sql.files.maxPartitionBytes: "134217728"
-              spark.sql.adaptive.enabled: "true"
-          
-          timeout_seconds: 7200
-          max_retries: 3
-          min_retry_interval_millis: 300000
-        
-        # Task 5: Ingest HVFHS data (2021)
-        - task_key: ingest_hvfhs_2021
-          depends_on:
-            - task_key: ingest_taxi_zones
-          
-          notebook_task:
-            notebook_path: ../src/ingestion/batch_ingest.py
-            base_parameters:
-              catalog: ${var.catalog_name}
-              taxi_type: high_volume_for_hire_vehicle
-              start_year: "2021"
-              end_year: "2021"
-              source_path: ${var.source_data_path}
-          
-          new_cluster:
-            spark_version: "14.3.x-scala2.12"
-            node_type_id: ${var.cluster_node_type}
-            autoscale:
-              min_workers: ${var.min_workers}
-              max_workers: ${var.max_workers}
-            spark_conf:
-              spark.databricks.delta.optimizeWrite.enabled: "true"
-              spark.databricks.delta.autoCompact.enabled: "true"
-          
-          timeout_seconds: 7200
-          max_retries: 3
-          min_retry_interval_millis: 300000
-        
-        # Task 6: Data quality validation
-        - task_key: validate_data_quality
-          depends_on:
-            - task_key: ingest_yellow_taxi_2021
-            - task_key: ingest_green_taxi_2021
-            - task_key: ingest_fhv_2021
-            - task_key: ingest_hvfhs_2021
-          
-          notebook_task:
-            notebook_path: ../src/quality/validate_delta.py
-            base_parameters:
-              catalog: ${var.catalog_name}
-              schema: raw
-          
-          new_cluster:
-            spark_version: "14.3.x-scala2.12"
-            node_type_id: ${var.cluster_node_type}
-            num_workers: 1
-          
-          timeout_seconds: 1800
-          max_retries: 1
-        
-        # Task 7: Optimize Delta tables
-        - task_key: optimize_tables
-          depends_on:
-            - task_key: validate_data_quality
-          
-          notebook_task:
-            notebook_path: ../src/optimization/optimize.py
-            base_parameters:
-              catalog: ${var.catalog_name}
-              schema: raw
-              operation: optimize
-          
-          new_cluster:
-            spark_version: "14.3.x-scala2.12"
-            node_type_id: ${var.cluster_node_type}
-            autoscale:
-              min_workers: ${var.min_workers}
-              max_workers: ${var.max_workers}
-          
+              year: "2023"
+              catalog: "${var.catalog_name}"
+              schema: "gm_test_schema"
+          job_cluster_key: "main_cluster"
           timeout_seconds: 3600
+          retry_on_timeout: true
           max_retries: 2
+          min_retry_interval_millis: 60000
+        
+        # Task 2: Silver Layer Transformation
+        - task_key: "silver_transformation"
+          description: "Cleanse and transform data to Silver layer"
+          depends_on:
+            - task_key: "bronze_ingestion"
+          notebook_task:
+            notebook_path: "../notebooks/silver_transformation.py"
+            base_parameters:
+              year: "2023"
+              catalog: "${var.catalog_name}"
+              schema: "gm_test_schema"
+          job_cluster_key: "main_cluster"
+          timeout_seconds: 3600
+          retry_on_timeout: true
+          max_retries: 2
+          min_retry_interval_millis: 60000
+        
+        # Task 3: Data Quality Validation
+        - task_key: "data_validation"
+          description: "Validate data quality in Silver layer"
+          depends_on:
+            - task_key: "silver_transformation"
+          notebook_task:
+            notebook_path: "../notebooks/data_validation.py"
+            base_parameters:
+              year: "2023"
+              catalog: "${var.catalog_name}"
+              schema: "gm_test_schema"
+          job_cluster_key: "main_cluster"
+          timeout_seconds: 1800
+        
+        # Task 4: Gold Layer Aggregation
+        - task_key: "gold_aggregation"
+          description: "Create business aggregates in Gold layer"
+          depends_on:
+            - task_key: "data_validation"
+          notebook_task:
+            notebook_path: "../notebooks/gold_aggregation.py"
+            base_parameters:
+              year: "2023"
+              catalog: "${var.catalog_name}"
+              schema: "gm_test_schema"
+          job_cluster_key: "main_cluster"
+          timeout_seconds: 3600
+          retry_on_timeout: true
+          max_retries: 2
+        
+        # Task 5: Gold Type Casting (Optional)
+        - task_key: "gold_type_casting"
+          description: "Cast Gold tables to logical types (optional)"
+          depends_on:
+            - task_key: "gold_aggregation"
+          notebook_task:
+            notebook_path: "../notebooks/gold_type_casting.py"
+            base_parameters:
+              year: "2023"
+              catalog: "${var.catalog_name}"
+              schema: "gm_test_schema"
+          job_cluster_key: "main_cluster"
+          timeout_seconds: 1800
+        
+        # Task 6: Table Optimization
+        - task_key: "optimize_tables"
+          description: "Optimize all Delta tables"
+          depends_on:
+            - task_key: "gold_type_casting"
+          notebook_task:
+            notebook_path: "../notebooks/table_optimization.py"
+            base_parameters:
+              year: "2023"
+              catalog: "${var.catalog_name}"
+              schema: "gm_test_schema"
+              run_vacuum: "false"
+          job_cluster_key: "main_cluster"
+          timeout_seconds: 3600
+        
+        # Task 7: Generate Analytics Dashboard
+        - task_key: "create_dashboard"
+          description: "Generate analytics visualizations"
+          depends_on:
+            - task_key: "optimize_tables"
+          notebook_task:
+            notebook_path: "/Shared/gm_analysis/02_analytics_dashboard"
+            base_parameters:
+              year: "2023"
+              catalog: "${var.catalog_name}"
+          job_cluster_key: "main_cluster"
+          timeout_seconds: 1800
       
-      # Job-level settings
-      max_concurrent_runs: 1
-      timeout_seconds: 28800  # 8 hours
+      # Schedule: Run daily at 2 AM UTC
+      schedule:
+        quartz_cron_expression: "0 0 2 * * ?"
+        timezone_id: "UTC"
+        pause_status: "PAUSED"  # Start paused, enable when ready
+    
+    # Maintenance Job - Run weekly
+    gm_maintenance_job:
+      name: "GM Delta Table Maintenance"
+      description: "Weekly maintenance job for VACUUM and OPTIMIZE"
       
-      # Permissions
-      permissions:
-        - level: CAN_MANAGE_RUN
-          user_name: ${workspace.current_user.userName}
+      job_clusters:
+        - job_cluster_key: "maintenance_cluster"
+          new_cluster:
+            spark_version: "13.3.x-scala2.12"
+            node_type_id: "${var.cluster_node_type}"
+            num_workers: 2
       
-      # Tags
-      tags:
-        environment: ${bundle.target}
-        project: nyc_taxi
-        pipeline: ingestion
-
+      email_notifications:
+        on_failure:
+          - "data-engineering@company.com"
+      
+      tasks:
+        - task_key: "vacuum_tables"
+          description: "VACUUM old files from Delta tables"
+          notebook_task:
+            notebook_path: "../notebooks/table_optimization.py"
+            base_parameters:
+              year: "2023"
+              catalog: "${var.catalog_name}"
+              schema: "gm_test_schema"
+              run_vacuum: "true"
+          job_cluster_key: "maintenance_cluster"
+          timeout_seconds: 7200
+      
+      # Schedule: Run weekly on Sunday at 3 AM UTC
+      schedule:
+        quartz_cron_expression: "0 0 3 ? * SUN"
+        timezone_id: "UTC"
+        pause_status: "PAUSED"

@@ -1,0 +1,71 @@
+{
+  "key_columns": [
+    "trip_id",
+    "vendor_id"
+  ],
+  "date_columns": [
+    "pickup_datetime",
+    "dropoff_datetime"
+  ],
+  "metric_columns": [
+    "passenger_count",
+    "trip_distance",
+    "fare_amount",
+    "tip_amount",
+    "tolls_amount",
+    "total_amount"
+  ],
+  "dimension_columns": [
+    "pickup_longitude",
+    "pickup_latitude",
+    "rate_code",
+    "store_and_fwd_flag",
+    "dropoff_longitude",
+    "dropoff_latitude",
+    "payment_type",
+    "extra",
+    "mta_tax"
+  ],
+  "all_columns": [
+    "trip_id",
+    "vendor_id",
+    "pickup_datetime",
+    "dropoff_datetime",
+    "passenger_count",
+    "trip_distance",
+    "pickup_longitude",
+    "pickup_latitude",
+    "rate_code",
+    "store_and_fwd_flag",
+    "dropoff_longitude",
+    "dropoff_latitude",
+    "payment_type",
+    "fare_amount",
+    "extra",
+    "mta_tax",
+    "tip_amount",
+    "tolls_amount",
+    "total_amount"
+  ],
+  "schema_info": {
+    "trip_id": "string",
+    "vendor_id": "int",
+    "pickup_datetime": "timestamp",
+    "dropoff_datetime": "timestamp",
+    "passenger_count": "int",
+    "trip_distance": "double",
+    "pickup_longitude": "double",
+    "pickup_latitude": "double",
+    "rate_code": "int",
+    "store_and_fwd_flag": "string",
+    "dropoff_longitude": "double",
+    "dropoff_latitude": "double",
+    "payment_type": "int",
+    "fare_amount": "double",
+    "extra": "double",
+    "mta_tax": "double",
+    "tip_amount": "double",
+    "tolls_amount": "double",
+    "total_amount": "double"
+  }
+}
