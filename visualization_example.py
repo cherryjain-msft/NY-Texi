@@ -11,6 +11,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from datetime import datetime, timedelta
+import tempfile
+import os
 
 
 def generate_sample_data():
@@ -18,6 +20,9 @@ def generate_sample_data():
     Generate sample monthly trip data by zone for demonstration.
     In the actual notebook, this data comes from Spark aggregations.
     """
+    # Set random seed for reproducibility
+    np.random.seed(42)
+    
     zones = ['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island', 'JFK', 'LGA']
     start_date = datetime(2021, 1, 1)
     months = pd.date_range(start=start_date, periods=60, freq='MS')  # 5 years monthly
@@ -66,7 +71,7 @@ def create_multiple_line_graph(pdf_monthly, save_path=None):
     
     Args:
         pdf_monthly: Pandas DataFrame with columns: year_month, pickup_zone, trips
-        save_path: Optional path to save the figure
+        save_path: Optional path to save the figure. If None, uses temp directory.
     """
     # Create the figure
     plt.figure(figsize=(12, 6))
@@ -98,10 +103,12 @@ def create_multiple_line_graph(pdf_monthly, save_path=None):
     # Adjust layout to prevent label cutoff
     plt.tight_layout()
     
-    # Save if path provided
-    if save_path:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"Figure saved to: {save_path}")
+    # Save if path provided, otherwise use temp directory
+    if save_path is None:
+        save_path = os.path.join(tempfile.gettempdir(), 'trips_by_zone.png')
+    
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    print(f"Figure saved to: {save_path}")
     
     # Display the plot
     plt.show()
@@ -124,7 +131,7 @@ def main():
     print(pdf_monthly.head(10))
     
     print("\nCreating multiple line graph visualization...")
-    create_multiple_line_graph(pdf_monthly, save_path='/tmp/trips_by_zone.png')
+    create_multiple_line_graph(pdf_monthly)
     
     print("\nVisualization complete!")
     print("\nThis demonstrates the same logic used in the Databricks notebook")
