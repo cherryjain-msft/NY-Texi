@@ -94,7 +94,7 @@ def plot_trips_by_city(
     logger.info("✓ Trips by city multi-line chart created")
 
 
-def create_trips_by_city_from_spark(spark, gold_table: str, catalog: str = "gm_demo", schema: str = "gm_test_schema"):
+def create_trips_by_city_from_spark(spark, gold_table: str, catalog: str = "gm_demo", schema: str = "gm_test_schema") -> None:
     """
     Create trips by city chart from a Spark DataFrame (gold layer table).
     

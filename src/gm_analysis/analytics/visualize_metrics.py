@@ -10,6 +10,7 @@ Purpose: Create visualizations for data quality and business metrics
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import col, count, sum as spark_sum, avg, date_format
 import matplotlib.pyplot as plt
+import pandas as pd
 import seaborn as sns
 from typing import Optional, List
 import logging
@@ -129,7 +130,6 @@ class AnalyticsVisualizer:
             })
         
         # Create DataFrame
-        import pandas as pd
         pdf = pd.DataFrame(null_stats)
         pdf = pdf.sort_values('null_percentage', ascending=True)
         
@@ -305,7 +305,6 @@ class AnalyticsVisualizer:
             return
         
         # Create a date column for the x-axis
-        import pandas as pd
         pdf['year_month'] = pd.to_datetime(
             pdf[[year_column, month_column]].assign(day=1)
         )
