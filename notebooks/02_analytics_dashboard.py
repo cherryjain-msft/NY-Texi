@@ -344,6 +344,125 @@ except Exception as e:
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ### Trips by Zone Over Time (Multiple Line Graph)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC This visualization shows the trend of taxi trips across different zones/cities over time.
+# MAGIC Each zone is represented as a separate line, making it easy to compare trip volumes
+# MAGIC and identify patterns across different areas.
+
+# COMMAND ----------
+
+try:
+    # Check if we have the required columns for trips by zone visualization
+    gold_daily_df = spark.table(f"{catalog}.{schema}.{gold_daily}")
+    columns = gold_daily_df.columns
+    
+    # Look for appropriate columns (might vary based on actual data structure)
+    date_col = None
+    zone_col = None
+    trips_col = None
+    
+    # Try to find date column
+    for col_name in ['pickup_date', 'agg_date', 'date', 'trip_date']:
+        if col_name in columns:
+            date_col = col_name
+            break
+    
+    # Try to find zone column
+    for col_name in ['pickup_zone', 'zone', 'city', 'borough']:
+        if col_name in columns:
+            zone_col = col_name
+            break
+    
+    # Try to find trips column
+    for col_name in ['trips', 'trip_count', 'num_trips', 'record_count']:
+        if col_name in columns:
+            trips_col = col_name
+            break
+    
+    if date_col and zone_col and trips_col:
+        # Fetch data for visualization
+        trips_by_zone_df = spark.sql(f"""
+            SELECT {date_col}, {zone_col}, {trips_col}
+            FROM {catalog}.{schema}.{gold_daily}
+            ORDER BY {date_col}, {zone_col}
+        """)
+        
+        pdf_zones = trips_by_zone_df.toPandas()
+        pdf_zones[date_col] = pd.to_datetime(pdf_zones[date_col])
+        
+        if not pdf_zones.empty:
+            # Create multiple line graph
+            fig, ax = plt.subplots(figsize=(16, 8))
+            
+            # Get unique zones and assign colors
+            zones = pdf_zones[zone_col].unique()
+            colors = plt.cm.Set2(range(len(zones)))
+            
+            # Plot each zone as a separate line
+            for i, zone in enumerate(sorted(zones)):
+                zone_data = pdf_zones[pdf_zones[zone_col] == zone].sort_values(date_col)
+                ax.plot(
+                    zone_data[date_col],
+                    zone_data[trips_col],
+                    marker='o',
+                    linewidth=2.5,
+                    markersize=5,
+                    label=zone,
+                    color=colors[i],
+                    alpha=0.85
+                )
+            
+            ax.set_xlabel('Date', fontsize=13, fontweight='bold')
+            ax.set_ylabel('Number of Trips', fontsize=13, fontweight='bold')
+            ax.set_title('Trips by Zone Over Time', fontsize=16, fontweight='bold', pad=20)
+            ax.grid(True, alpha=0.3, linestyle='--')
+            ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{int(x):,}'))
+            
+            # Enhanced legend
+            ax.legend(
+                title='Zone/City',
+                title_fontsize=11,
+                fontsize=10,
+                loc='center left',
+                bbox_to_anchor=(1, 0.5),
+                frameon=True,
+                fancybox=True,
+                shadow=True
+            )
+            
+            plt.xticks(rotation=45, ha='right')
+            plt.tight_layout()
+            plt.show()
+            
+            # Print summary statistics
+            print(f"\n{'='*80}")
+            print(f"TRIPS BY ZONE SUMMARY")
+            print(f"{'='*80}")
+            total_by_zone = pdf_zones.groupby(zone_col)[trips_col].sum().sort_values(ascending=False)
+            for zone, total in total_by_zone.items():
+                avg_daily = total / len(pdf_zones[pdf_zones[zone_col] == zone])
+                print(f"  {zone:20s}: {int(total):,} total trips | {int(avg_daily):,} avg daily")
+            print(f"  {'─' * 76}")
+            print(f"  {'TOTAL':20s}: {int(total_by_zone.sum()):,} trips")
+            print(f"{'='*80}\n")
+        else:
+            print("No data available for trips by zone visualization")
+    else:
+        print(f"Required columns not found. Available columns: {columns}")
+        print(f"Looking for: date column, zone column, trips column")
+        
+except Exception as e:
+    print(f"Could not create trips by zone visualization: {e}")
+    import traceback
+    traceback.print_exc()
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## 5. Performance Analytics
 
 # COMMAND ----------

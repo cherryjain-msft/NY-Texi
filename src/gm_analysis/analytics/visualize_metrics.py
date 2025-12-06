@@ -11,6 +11,7 @@ from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import col, count, sum as spark_sum, avg, date_format
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pandas as pd
 from typing import Optional, List
 import logging
 
@@ -260,6 +261,104 @@ class AnalyticsVisualizer:
         
         logger.info("✓ Business metrics chart created")
     
+    def plot_trips_by_zone(
+        self,
+        table_name: str,
+        date_column: str = "pickup_date",
+        zone_column: str = "pickup_zone",
+        trips_column: str = "trips",
+        title: Optional[str] = None
+    ) -> None:
+        """
+        Plot multiple line graph showing trips by zone/city over time
+        
+        Args:
+            table_name: Gold table name (typically daily aggregations)
+            date_column: Date column for x-axis
+            zone_column: Zone/city column for grouping lines
+            trips_column: Trips count column for y-axis
+            title: Optional custom title
+        """
+        logger.info(f"Creating multi-line trips by zone chart for {table_name}")
+        
+        full_table_name = f"{self.catalog}.{self.schema}.{table_name}"
+        
+        try:
+            df = self.spark.sql(f"""
+                SELECT {date_column}, {zone_column}, {trips_column}
+                FROM {full_table_name}
+                ORDER BY {date_column}, {zone_column}
+            """)
+            
+            pdf = df.toPandas()
+            
+            if pdf.empty:
+                logger.warning(f"No data found in {table_name}")
+                return
+            
+            # Convert date column to datetime
+            pdf[date_column] = pd.to_datetime(pdf[date_column])
+            
+            # Create plot
+            fig, ax = plt.subplots(figsize=(14, 7))
+            
+            # Define color palette for different zones
+            zones = pdf[zone_column].unique()
+            colors = plt.cm.Set2(range(len(zones)))
+            
+            # Plot each zone as a separate line
+            for i, zone in enumerate(sorted(zones)):
+                zone_data = pdf[pdf[zone_column] == zone].sort_values(date_column)
+                ax.plot(
+                    zone_data[date_column],
+                    zone_data[trips_column],
+                    marker='o',
+                    linewidth=2,
+                    markersize=4,
+                    label=zone,
+                    color=colors[i],
+                    alpha=0.8
+                )
+            
+            ax.set_xlabel('Date', fontsize=12, fontweight='bold')
+            ax.set_ylabel('Number of Trips', fontsize=12, fontweight='bold')
+            ax.set_title(
+                title or 'Trips by Zone Over Time',
+                fontsize=14,
+                fontweight='bold'
+            )
+            ax.grid(True, alpha=0.3)
+            ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{int(x):,}'))
+            
+            # Place legend outside the plot area
+            ax.legend(
+                title='Zone',
+                loc='center left',
+                bbox_to_anchor=(1, 0.5),
+                frameon=True,
+                fancybox=True,
+                shadow=True
+            )
+            
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+            plt.show()
+            
+            logger.info("✓ Multi-line trips by zone chart created")
+            
+            # Print summary statistics
+            print(f"\n{'='*80}")
+            print(f"TRIPS BY ZONE SUMMARY")
+            print(f"{'='*80}")
+            total_by_zone = pdf.groupby(zone_column)[trips_column].sum().sort_values(ascending=False)
+            for zone, total in total_by_zone.items():
+                print(f"  {zone:20s}: {total:,} trips")
+            print(f"{'='*80}\n")
+            
+        except Exception as e:
+            logger.error(f"Error creating trips by zone chart: {e}")
+            raise
+    
     def create_dashboard_summary(
         self,
         year: str = "2023"
@@ -368,7 +467,61 @@ def create_visualizations(
     #     gold_table=f"gold_gm_data_{year}_daily"
     # )
     
+    # # Multiple line graph: Trips by zone over time
+    # viz.plot_trips_by_zone(
+    #     table_name=f"gold_gm_data_{year}_daily",
+    #     date_column="pickup_date",
+    #     zone_column="pickup_zone",
+    #     trips_column="trips"
+    # )
+    
     logger.info("✓ All visualizations created")
+
+
+def create_trips_by_zone_chart(
+    spark: SparkSession,
+    catalog: str = "gm_demo",
+    schema: str = "gm_test_schema",
+    table_name: str = "gold_gm_data_2023_daily",
+    date_column: str = "pickup_date",
+    zone_column: str = "pickup_zone",
+    trips_column: str = "trips",
+    title: Optional[str] = None
+) -> None:
+    """
+    Standalone function to create a multiple line graph showing trips by zone/city over time.
+    
+    This function visualizes taxi trip trends across different zones (cities/boroughs) 
+    with each zone represented as a separate line on the graph.
+    
+    Args:
+        spark: SparkSession
+        catalog: Unity Catalog name
+        schema: Schema name
+        table_name: Gold table name (typically daily aggregations)
+        date_column: Date column for x-axis (default: "pickup_date")
+        zone_column: Zone/city column for grouping lines (default: "pickup_zone")
+        trips_column: Trips count column for y-axis (default: "trips")
+        title: Optional custom title for the chart
+        
+    Example:
+        >>> create_trips_by_zone_chart(spark)
+        # Creates chart with default settings
+        
+        >>> create_trips_by_zone_chart(
+        ...     spark,
+        ...     table_name="gold_gm_data_2024_daily",
+        ...     title="NYC Taxi Trips by Zone - 2024"
+        ... )
+    """
+    viz = AnalyticsVisualizer(spark, catalog=catalog, schema=schema)
+    viz.plot_trips_by_zone(
+        table_name=table_name,
+        date_column=date_column,
+        zone_column=zone_column,
+        trips_column=trips_column,
+        title=title
+    )
 
 
 if __name__ == "__main__":
