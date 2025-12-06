@@ -259,6 +259,88 @@ class AnalyticsVisualizer:
         plt.show()
         
         logger.info("✓ Business metrics chart created")
+
+    def plot_trips_by_city(
+        self,
+        gold_table: str,
+        year_column: str = "year",
+        month_column: str = "month",
+        city_column: str = "pickup_zone",
+        trips_column: str = "trips",
+        title: Optional[str] = None
+    ) -> None:
+        """
+        Create a multiple line graph showing trips by city (zone) over time.
+        
+        Each city/zone is represented by a separate line, allowing comparison
+        of trip volumes across different geographic areas over time.
+        
+        Args:
+            gold_table: Gold table name containing aggregated trip data
+            year_column: Column name for year
+            month_column: Column name for month
+            city_column: Column name for city/zone identifier
+            trips_column: Column name for trip count metric
+            title: Optional custom title for the chart
+        """
+        logger.info(f"Creating trips by city multi-line chart for {gold_table}")
+        
+        full_table_name = f"{self.catalog}.{self.schema}.{gold_table}"
+        
+        # Query to get trips by city and month
+        df = self.spark.sql(f"""
+            SELECT 
+                {year_column},
+                {month_column},
+                {city_column},
+                {trips_column}
+            FROM {full_table_name}
+            ORDER BY {year_column}, {month_column}, {city_column}
+        """)
+        
+        pdf = df.toPandas()
+        
+        if pdf.empty:
+            logger.warning(f"No data found in {gold_table}")
+            return
+        
+        # Create a date column for the x-axis
+        import pandas as pd
+        pdf['year_month'] = pd.to_datetime(
+            pdf[[year_column, month_column]].assign(day=1)
+        )
+        
+        # Create the multi-line plot
+        fig, ax = plt.subplots(figsize=(12, 6))
+        
+        # Plot a line for each city/zone
+        for city, city_data in pdf.groupby(city_column):
+            city_data = city_data.sort_values('year_month')
+            ax.plot(
+                city_data['year_month'], 
+                city_data[trips_column], 
+                marker='o', 
+                label=city, 
+                linewidth=2, 
+                markersize=4
+            )
+        
+        ax.set_xlabel('Month', fontsize=12)
+        ax.set_ylabel('Number of Trips', fontsize=12)
+        ax.set_title(
+            title or 'Trips by City (Zone) Over Time', 
+            fontsize=14, 
+            fontweight='bold'
+        )
+        ax.legend(title='Zone', bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.grid(True, alpha=0.3)
+        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{int(x):,}'))
+        
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.show()
+        
+        logger.info("✓ Trips by city multi-line chart created")
     
     def create_dashboard_summary(
         self,
@@ -366,6 +448,15 @@ def create_visualizations(
     #     bronze_table=f"bronze_gm_data_{year}",
     #     silver_table=f"silver_gm_data_{year}",
     #     gold_table=f"gold_gm_data_{year}_daily"
+    # )
+    
+    # # Trips by city (zone) over time - multi-line graph
+    # viz.plot_trips_by_city(
+    #     gold_table=f"gold_gm_data_{year}_monthly",
+    #     year_column="year",
+    #     month_column="month",
+    #     city_column="pickup_zone",
+    #     trips_column="trips"
     # )
     
     logger.info("✓ All visualizations created")
